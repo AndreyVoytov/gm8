@@ -130,6 +130,16 @@
           Число секторов
           <input type="number" min="2" step="1" id="sectors" value="6" />
         </label>
+        <label>
+          Сила замедления (степень, 1 = линейно)
+          <input
+            type="number"
+            min="1"
+            step="0.5"
+            id="deceleration"
+            value="3"
+          />
+        </label>
         <button class="secondary" type="submit">Обновить колесо</button>
       </form>
     </div>
@@ -144,6 +154,7 @@
     const rotationsInput = document.getElementById("rotations");
     const durationInput = document.getElementById("duration");
     const sectorsInput = document.getElementById("sectors");
+    const decelerationInput = document.getElementById("deceleration");
 
     let sectors = 6;
     let currentRotation = 0;
@@ -199,6 +210,10 @@
       if (isSpinning) return;
       const fullRotations = Math.max(0, Number(rotationsInput.value) || 0);
       const timePerRotation = Math.max(0.1, Number(durationInput.value) || 1);
+      const decelerationPower = Math.max(
+        1,
+        Number(decelerationInput.value) || 3
+      );
       const arc = (2 * Math.PI) / sectors;
       const targetSector = Math.floor(Math.random() * sectors);
       const targetAngle = (2 * Math.PI) - (targetSector * arc + arc / 2);
@@ -217,7 +232,7 @@
       const animate = (now) => {
         const elapsed = now - startTime;
         const progress = Math.min(elapsed / durationMs, 1);
-        const easeOut = 1 - Math.pow(1 - progress, 3);
+        const easeOut = 1 - Math.pow(1 - progress, decelerationPower);
         const angle = startRotation + totalDelta * easeOut;
         setRotation(angle);
         if (progress < 1) {
