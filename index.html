@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Колесо фортуны</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+    body {
+      margin: 0;
+      padding: 32px;
+      background: #f5f6fa;
+      color: #1f2430;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+    .layout {
+      width: min(980px, 100%);
+      display: grid;
+      gap: 24px;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      align-items: start;
+    }
+    .panel {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 12px 32px rgba(28, 40, 68, 0.12);
+      padding: 20px;
+    }
+    .wheel-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .wheel-wrapper {
+      position: relative;
+      width: 320px;
+      height: 320px;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: 8px solid #ffffff;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+      transition: transform 0.2s ease-out;
+    }
+    .pointer {
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 14px solid transparent;
+      border-right: 14px solid transparent;
+      border-bottom: 24px solid #1f2430;
+    }
+    form {
+      display: grid;
+      gap: 16px;
+    }
+    label {
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    input {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #d3d7e3;
+      font-size: 16px;
+    }
+    button {
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .primary {
+      background: #4b70ff;
+      color: #ffffff;
+    }
+    .secondary {
+      background: #e9ecf8;
+      color: #1f2430;
+    }
+    .status {
+      font-size: 14px;
+      color: #53607a;
+    }
+  </style>
+</head>
+<body>
+  <h1>Колесо фортуны</h1>
+  <div class="layout">
+    <div class="panel wheel-area">
+      <div class="wheel-wrapper">
+        <div class="pointer" aria-hidden="true"></div>
+        <canvas id="wheel" width="320" height="320"></canvas>
+      </div>
+      <button class="primary" id="spin">Вращать</button>
+      <div class="status" id="status">Готово к запуску.</div>
+    </div>
+    <div class="panel">
+      <form id="settings">
+        <label>
+          Обороты (полные перед остановом)
+          <input type="number" min="0" step="1" id="rotations" value="2" />
+        </label>
+        <label>
+          Время оборота (сек)
+          <input type="number" min="0.2" step="0.1" id="duration" value="1" />
+        </label>
+        <label>
+          Число секторов
+          <input type="number" min="2" step="1" id="sectors" value="6" />
+        </label>
+        <button class="secondary" type="submit">Обновить колесо</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("wheel");
+    const ctx = canvas.getContext("2d");
+    const spinButton = document.getElementById("spin");
+    const statusText = document.getElementById("status");
+    const form = document.getElementById("settings");
+    const rotationsInput = document.getElementById("rotations");
+    const durationInput = document.getElementById("duration");
+    const sectorsInput = document.getElementById("sectors");
+
+    let sectors = 6;
+    let currentRotation = 0;
+    let isSpinning = false;
+
+    const createColors = (count) =>
+      Array.from({ length: count }, (_, index) =>
+        `hsl(${Math.round((360 / count) * index)}, 80%, 60%)`
+      );
+
+    const drawWheel = () => {
+      const radius = canvas.width / 2;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const colors = createColors(sectors);
+      const arc = (2 * Math.PI) / sectors;
+      let startAngle = -Math.PI / 2;
+
+      for (let i = 0; i < sectors; i += 1) {
+        const endAngle = startAngle + arc;
+        ctx.beginPath();
+        ctx.moveTo(radius, radius);
+        ctx.arc(radius, radius, radius - 6, startAngle, endAngle);
+        ctx.fillStyle = colors[i];
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        const labelAngle = startAngle + arc / 2;
+        ctx.save();
+        ctx.translate(radius, radius);
+        ctx.rotate(labelAngle);
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#1f2430";
+        ctx.font = "600 14px sans-serif";
+        ctx.fillText(`Сектор ${i + 1}`, radius - 18, 5);
+        ctx.restore();
+
+        startAngle = endAngle;
+      }
+    };
+
+    const setRotation = (angle) => {
+      canvas.style.transform = `rotate(${angle}rad)`;
+    };
+
+    const normalizeAngle = (angle) => {
+      const twoPi = 2 * Math.PI;
+      return ((angle % twoPi) + twoPi) % twoPi;
+    };
+
+    const spinWheel = () => {
+      if (isSpinning) return;
+      const fullRotations = Math.max(0, Number(rotationsInput.value) || 0);
+      const timePerRotation = Math.max(0.1, Number(durationInput.value) || 1);
+      const arc = (2 * Math.PI) / sectors;
+      const targetSector = Math.floor(Math.random() * sectors);
+      const targetAngle = (2 * Math.PI) - (targetSector * arc + arc / 2);
+      const currentAngle = normalizeAngle(currentRotation);
+      const delta = normalizeAngle(targetAngle - currentAngle);
+      const totalDelta = fullRotations * 2 * Math.PI + delta;
+      const durationMs =
+        (fullRotations + delta / (2 * Math.PI)) * timePerRotation * 1000;
+
+      const startRotation = currentRotation;
+      const endRotation = startRotation + totalDelta;
+      const startTime = performance.now();
+      isSpinning = true;
+      statusText.textContent = `Вращаем... Выпадает сектор ${targetSector + 1}`;
+
+      const animate = (now) => {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / durationMs, 1);
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+        const angle = startRotation + totalDelta * easeOut;
+        setRotation(angle);
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          currentRotation = endRotation;
+          isSpinning = false;
+          statusText.textContent = `Остановились на секторе ${targetSector + 1}.`;
+        }
+      };
+
+      requestAnimationFrame(animate);
+    };
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const nextSectors = Math.max(2, Number(sectorsInput.value) || 2);
+      sectors = nextSectors;
+      currentRotation = normalizeAngle(currentRotation);
+      setRotation(currentRotation);
+      drawWheel();
+      statusText.textContent = "Настройки обновлены.";
+    });
+
+    spinButton.addEventListener("click", spinWheel);
+
+    drawWheel();
+  </script>
+</body>
+</html>
